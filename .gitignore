@@ -1,0 +1,14 @@
+# Segredos locais — nunca commitar
+.env
+
+# Estado de execução (histórico de vagas vistas) — dado de runtime, não código.
+# Rodando localmente ele é recriado sozinho na primeira execução.
+seen_jobs.json
+
+# Binários de build (ex: bootstrap gerado pro deploy da Lambda)
+bootstrap
+*.zip
+deployment.zip
+
+# Config local do editor/IDE deste projeto (não faz parte do código)
+.claude/
