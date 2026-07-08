@@ -55,8 +55,11 @@ Isso é controlado pela env var `HEARTBEAT_HOURS` — ajuste ou desative
 cp .env.example .env
 # edite o .env com suas credenciais de SMTP (e opcionalmente KEYWORDS)
 go mod tidy
-export $(cat .env | xargs) && go run .
+go run .
 ```
+
+O programa carrega o `.env` automaticamente (via `godotenv`) quando não está
+rodando em Lambda — não precisa exportar as variáveis manualmente antes.
 
 Sem `S3_BUCKET` definido, o histórico de vagas vistas fica em `seen_jobs.json`
 local — mesmo comportamento de antes, bom pra testar.

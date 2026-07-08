@@ -25,6 +25,7 @@ import (
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/aws/aws-lambda-go/lambda"
+	"github.com/joho/godotenv"
 )
 
 const (
@@ -46,6 +47,10 @@ func main() {
 		lambda.Start(handler)
 		return
 	}
+
+	// Localmente, carrega o .env pro ambiente do processo (ausência do
+	// arquivo não é erro — dá pra rodar só com env vars já exportadas).
+	_ = godotenv.Load()
 
 	if err := run(context.Background()); err != nil {
 		log.Fatal(err)
