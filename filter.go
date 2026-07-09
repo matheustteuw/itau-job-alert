@@ -5,9 +5,7 @@ import (
 	"strings"
 )
 
-// defaultKeywords é usado quando a variável de ambiente KEYWORDS não é definida.
 // Uma vaga só é considerada relevante se o título contiver pelo menos uma
-// dessas palavras (comparação sem acento e sem diferenciar maiúsc/minúsc).
 var defaultKeywords = []string{
 	"engenheiro",
 	"engenharia",
@@ -19,37 +17,75 @@ var defaultKeywords = []string{
 	"senior",
 }
 
-// loadKeywords lê a lista de palavras-chave da variável de ambiente KEYWORDS
-// (separadas por vírgula). Se não estiver definida, usa defaultKeywords.
-func loadKeywords() []string {
-	raw := os.Getenv("KEYWORDS")
+// defaultExcludeKeywords derruba vagas afirmativas exclusivas pra pessoas
+// com deficiência, independente de baterem com defaultKeywords — tanto o
+// Itaú ("Exclusiva para Pessoas com deficiência") quanto o PicPay
+// ("Exclusiva PCD") marcam isso no próprio título da vaga.
+var defaultExcludeKeywords = []string{
+	"pcd",
+	"deficiencia",
+}
+
+// loadCSVEnv lê uma lista separada por vírgula da env var indicada. Se não
+// estiver definida (ou vazia após o parse), usa fallback.
+func loadCSVEnv(envVar string, fallback []string) []string {
+	raw := os.Getenv(envVar)
 	if strings.TrimSpace(raw) == "" {
-		return defaultKeywords
+		return fallback
 	}
 	parts := strings.Split(raw, ",")
-	keywords := make([]string, 0, len(parts))
+	values := make([]string, 0, len(parts))
 	for _, p := range parts {
 		p = strings.TrimSpace(p)
 		if p != "" {
-			keywords = append(keywords, p)
+			values = append(values, p)
 		}
 	}
-	if len(keywords) == 0 {
-		return defaultKeywords
+	if len(values) == 0 {
+		return fallback
 	}
-	return keywords
+	return values
 }
 
-// filterJobs mantém apenas as vagas cujo título casa com alguma keyword.
-func filterJobs(jobs []Job, keywords []string) []Job {
+// loadKeywords lê a lista de palavras-chave da variável de ambiente KEYWORDS
+// (separadas por vírgula). Se não estiver definida, usa defaultKeywords.
+func loadKeywords() []string {
+	return loadCSVEnv("KEYWORDS", defaultKeywords)
+}
+
+// loadExcludeKeywords lê a lista de exclusão da env var EXCLUDE_KEYWORDS. Se
+// não estiver definida, usa defaultExcludeKeywords.
+func loadExcludeKeywords() []string {
+	return loadCSVEnv("EXCLUDE_KEYWORDS", defaultExcludeKeywords)
+}
+
+// filterJobs mantém apenas as vagas cujo título casa com alguma keyword e
+// não casa com nenhuma excludeKeyword (exclusão tem prioridade).
+func filterJobs(jobs []Job, keywords, excludeKeywords []string) []Job {
 	normKeywords := make([]string, len(keywords))
 	for i, kw := range keywords {
 		normKeywords[i] = normalize(kw)
+	}
+	normExclude := make([]string, len(excludeKeywords))
+	for i, kw := range excludeKeywords {
+		normExclude[i] = normalize(kw)
 	}
 
 	var out []Job
 	for _, j := range jobs {
 		title := normalize(j.Title)
+
+		excluded := false
+		for _, kw := range normExclude {
+			if strings.Contains(title, kw) {
+				excluded = true
+				break
+			}
+		}
+		if excluded {
+			continue
+		}
+
 		for _, kw := range normKeywords {
 			if strings.Contains(title, kw) {
 				out = append(out, j)

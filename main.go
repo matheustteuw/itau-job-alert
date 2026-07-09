@@ -1,14 +1,3 @@
-// itau-job-alert monitora a listagem de vagas de Tecnologia do Itaú
-// e envia um e-mail sempre que aparece uma vaga nova que bate com as
-// palavras-chave configuradas (veja filter.go).
-//
-// Roda tanto localmente quanto como AWS Lambda:
-//   - Local: go run .
-//   - Lambda: o runtime seta a env var AWS_LAMBDA_FUNCTION_NAME automaticamente,
-//     e o binário entra em lambda.Start(). Agendado via EventBridge (ex: a cada 15 min).
-//
-// Cada execução faz UMA checagem — não fica em loop, quem controla a
-// frequência é o agendador (EventBridge no Lambda, cron/systemd localmente).
 package main
 
 import (
@@ -29,27 +18,24 @@ import (
 )
 
 const (
-	// Página de vagas de Tecnologia do Itaú. O %d no final é o número da página.
 	baseURL  = "https://carreiras.itau.com.br/%%C3%%A1rea/tecnologia-jobs/35299/8274976/%d"
-	maxPages = 8 // teto de segurança, a listagem raramente passa disso
+	maxPages = 8
 	seenFile = "seen_jobs.json"
 )
 
 type Job struct {
-	ID    string `json:"id"`
-	Title string `json:"title"`
-	URL   string `json:"url"`
+	ID      string `json:"id"`
+	Title   string `json:"title"`
+	URL     string `json:"url"`
+	Company string `json:"company"`
 }
 
 func main() {
-	// A Lambda seta essa env var automaticamente; localmente ela não existe.
 	if os.Getenv("AWS_LAMBDA_FUNCTION_NAME") != "" {
 		lambda.Start(handler)
 		return
 	}
 
-	// Localmente, carrega o .env pro ambiente do processo (ausência do
-	// arquivo não é erro — dá pra rodar só com env vars já exportadas).
 	_ = godotenv.Load()
 
 	if err := run(context.Background()); err != nil {
@@ -57,8 +43,6 @@ func main() {
 	}
 }
 
-// handler é o entrypoint chamado pelo runtime da Lambda a cada invocação
-// (disparada pela regra do EventBridge).
 func handler(ctx context.Context) error {
 	return run(ctx)
 }
@@ -66,14 +50,23 @@ func handler(ctx context.Context) error {
 // run faz uma checagem completa: busca vagas, filtra, compara com o histórico
 // e manda e-mail se tiver vaga nova relevante.
 func run(ctx context.Context) error {
-	jobs, err := fetchAllTechJobs()
+	itauJobs, err := fetchAllTechJobs()
 	if err != nil {
-		return fmt.Errorf("erro ao buscar vagas: %w", err)
+		return fmt.Errorf("erro ao buscar vagas do Itaú: %w", err)
 	}
-	log.Printf("encontradas %d vagas de tecnologia na página do Itaú", len(jobs))
+	log.Printf("encontradas %d vagas de tecnologia na página do Itaú", len(itauJobs))
+
+	picpayJobs, err := fetchPicPayJobs()
+	if err != nil {
+		return fmt.Errorf("erro ao buscar vagas do PicPay: %w", err)
+	}
+	log.Printf("encontradas %d vagas no PicPay", len(picpayJobs))
+
+	jobs := append(itauJobs, picpayJobs...)
 
 	keywords := loadKeywords()
-	jobs = filterJobs(jobs, keywords)
+	excludeKeywords := loadExcludeKeywords()
+	jobs = filterJobs(jobs, keywords, excludeKeywords)
 	log.Printf("%d vaga(s) relevante(s) após filtro de palavras-chave", len(jobs))
 
 	st, err := newStore(ctx)
@@ -117,11 +110,9 @@ func run(ctx context.Context) error {
 
 	log.Printf("%d vaga(s) nova(s), enviando e-mail...", len(novas))
 	if err := sendEmail(novas); err != nil {
-		// Não salva o histórico se o e-mail falhou, pra tentar de novo na próxima execução
 		return fmt.Errorf("erro ao enviar e-mail: %w", err)
 	}
 
-	// Um e-mail de vaga nova já mostra que o sistema está de pé, então conta como heartbeat.
 	state.LastHeartbeat = time.Now()
 	if err := st.Save(ctx, state); err != nil {
 		return fmt.Errorf("erro ao salvar histórico: %w", err)
@@ -130,9 +121,6 @@ func run(ctx context.Context) error {
 	return nil
 }
 
-// heartbeatInterval controla de quanto em quanto tempo, no máximo, o
-// programa manda um e-mail de status quando não há vaga nova (só pra avisar
-// "ainda estou rodando"). Configurável via HEARTBEAT_HOURS; default 24h.
 func heartbeatInterval() time.Duration {
 	raw := os.Getenv("HEARTBEAT_HOURS")
 	if raw == "" {
@@ -145,13 +133,10 @@ func heartbeatInterval() time.Duration {
 	return time.Duration(hours) * time.Hour
 }
 
-// shouldSendHeartbeat decide se já passou tempo suficiente desde o último
-// heartbeat pra mandar um novo e-mail de status.
 func shouldSendHeartbeat(last, now time.Time, interval time.Duration) bool {
 	return now.Sub(last) >= interval
 }
 
-// fetchAllTechJobs percorre as páginas da listagem de Tecnologia e retorna todas as vagas encontradas.
 func fetchAllTechJobs() ([]Job, error) {
 	var all []Job
 	client := &http.Client{Timeout: 20 * time.Second}
@@ -163,7 +148,6 @@ func fetchAllTechJobs() ([]Job, error) {
 		if err != nil {
 			return nil, err
 		}
-		// Um User-Agent "normal" evita bloqueios bobos de bot básico.
 		req.Header.Set("User-Agent", "Mozilla/5.0 (compatible; itau-job-alert/1.0; personal use)")
 
 		resp, err := client.Do(req)
@@ -178,12 +162,11 @@ func fetchAllTechJobs() ([]Job, error) {
 
 		pageJobs := parseJobs(doc)
 		if len(pageJobs) == 0 {
-			// página vazia = acabaram as páginas
 			break
 		}
 		all = append(all, pageJobs...)
 
-		time.Sleep(1 * time.Second) // educado com o servidor deles
+		time.Sleep(1 * time.Second)
 	}
 
 	return all, nil
@@ -191,7 +174,6 @@ func fetchAllTechJobs() ([]Job, error) {
 
 var idFromURL = regexp.MustCompile(`/vaga/[^/]+/[^/]+/\d+/(\d+)`)
 
-// parseJobs extrai as vagas de uma página de listagem já carregada.
 func parseJobs(doc *goquery.Document) []Job {
 	var jobs []Job
 	seenOnPage := map[string]bool{}
@@ -219,13 +201,12 @@ func parseJobs(doc *goquery.Document) []Job {
 			href = "https://carreiras.itau.com.br" + href
 		}
 
-		jobs = append(jobs, Job{ID: id, Title: title, URL: href})
+		jobs = append(jobs, Job{ID: id, Title: title, URL: href, Company: "Itaú"})
 	})
 
 	return jobs
 }
 
-// sendEmail manda um único e-mail listando todas as vagas novas encontradas.
 func sendEmail(jobs []Job) error {
 	host := os.Getenv("SMTP_HOST")
 	portStr := os.Getenv("SMTP_PORT")
@@ -246,7 +227,7 @@ func sendEmail(jobs []Job) error {
 	subject := fmt.Sprintf("[Itau Jobs] %d vaga(s) nova(s) de Tecnologia", len(jobs))
 	body.WriteString(fmt.Sprintf("Vaga(s) nova(s) encontradas em %s:\n\n", time.Now().Format("02/01/2006 15:04")))
 	for _, j := range jobs {
-		body.WriteString(fmt.Sprintf("- %s\n  %s\n\n", j.Title, j.URL))
+		body.WriteString(fmt.Sprintf("- [%s] %s\n  %s\n\n", j.Company, j.Title, j.URL))
 	}
 
 	msg := []byte(

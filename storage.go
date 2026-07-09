@@ -16,19 +16,11 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 )
 
-// State é o que fica salvo entre execuções: quais vagas já foram vistas e
-// quando foi mandado o último e-mail de heartbeat (veja shouldSendHeartbeat
-// em main.go).
 type State struct {
 	Seen          map[string]bool `json:"seen"`
 	LastHeartbeat time.Time       `json:"last_heartbeat"`
 }
 
-// store guarda o histórico de vagas já vistas (seen_jobs.json) entre execuções.
-//
-// Rodando em Lambda não tem disco persistente entre invocações, então usamos o
-// S3 (configurado via S3_BUCKET) pra guardar esse arquivo. Localmente, sem
-// S3_BUCKET definido, cai pro disco (comportamento antigo), o que facilita testar.
 type store interface {
 	Load(ctx context.Context) (State, error)
 	Save(ctx context.Context, state State) error

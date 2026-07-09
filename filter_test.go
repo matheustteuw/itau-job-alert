@@ -12,7 +12,7 @@ func TestFilterJobs(t *testing.T) {
 		{ID: "6", Title: "Product Owner"},
 	}
 
-	got := filterJobs(jobs, defaultKeywords)
+	got := filterJobs(jobs, defaultKeywords, defaultExcludeKeywords)
 
 	wantIDs := map[string]bool{"1": true, "2": true, "3": true, "5": true}
 	if len(got) != len(wantIDs) {
@@ -22,6 +22,20 @@ func TestFilterJobs(t *testing.T) {
 		if !wantIDs[j.ID] {
 			t.Errorf("vaga %q (id=%s) não deveria ter passado no filtro", j.Title, j.ID)
 		}
+	}
+}
+
+func TestFilterJobsExcludesPCD(t *testing.T) {
+	jobs := []Job{
+		{ID: "1", Title: "Engenharia de Software Backend Java/Python Pleno | Exclusiva para Pessoas com deficiência"},
+		{ID: "2", Title: "Analista Relacionamento Cliente I | Exclusiva PCD"},
+		{ID: "3", Title: "Engenheiro de Software Sênior - Backend Java"},
+	}
+
+	got := filterJobs(jobs, defaultKeywords, defaultExcludeKeywords)
+
+	if len(got) != 1 || got[0].ID != "3" {
+		t.Errorf("esperava só a vaga 3 (as PCD deveriam ser excluídas), veio %+v", got)
 	}
 }
 

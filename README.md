@@ -1,19 +1,22 @@
 # itau-job-alert
 
-Monitora a página de vagas de **Tecnologia** do Itaú e manda um e-mail quando
-aparece uma vaga nova que bate com seu filtro de palavras-chave. Cada execução
-faz UMA checagem (não fica em loop infinito) — quem controla a frequência é o
-agendador (EventBridge no Lambda, cron/systemd se rodar localmente).
+Monitora as vagas de **Tecnologia** do Itaú e do PicPay e manda um e-mail
+quando aparece uma vaga nova que bate com seu filtro de palavras-chave. Cada
+execução faz UMA checagem (não fica em loop infinito) — quem controla a
+frequência é o agendador (EventBridge no Lambda, cron/systemd se rodar
+localmente).
 
 ## Como funciona
 
-1. Baixa as páginas de `carreiras.itau.com.br` filtradas pra área Tecnologia.
-2. Extrai título + link de cada vaga.
-3. Filtra pelo título usando as palavras-chave de `KEYWORDS` (veja
+1. Baixa as vagas de `carreiras.itau.com.br` (HTML) e da API pública de
+   carreiras do PicPay (JSON, Oracle Cloud HCM).
+2. Extrai título + link de cada vaga, de ambas as fontes.
+3. Filtra pelo título usando as palavras-chave de `KEYWORDS` e descarta
+   as que batem com `EXCLUDE_KEYWORDS` (veja
    [Filtro de vagas](#filtro-de-vagas)).
 4. Compara com o histórico do que já foi visto (`seen_jobs.json`, local ou no S3).
 5. Se tiver vaga nova relevante, manda **um e-mail só** listando todas as
-   novas e atualiza o histórico.
+   novas (de qualquer empresa) e atualiza o histórico.
 
 Não faz candidatura automática — só avisa. Dá pra evoluir depois.
 
@@ -35,6 +38,17 @@ KEYWORDS=Engenheiro,Engenharia,Java,.NET,Desenvolvedor,Junior,Pleno,Senior,Backe
 
 Isso dá pra ajustar sem recompilar/redeployar código — só mudar a env var no
 console do Lambda (ou no `.env` local) e a próxima execução já usa o novo filtro.
+
+Além disso, vaga cujo título bate com `EXCLUDE_KEYWORDS` é descartada mesmo
+que bata com `KEYWORDS` — a exclusão tem prioridade. Por padrão isso derruba
+vagas afirmativas exclusivas pra pessoas com deficiência (`pcd`,
+`deficiencia`), já que tanto o Itaú ("Exclusiva para Pessoas com
+deficiência") quanto o PicPay ("Exclusiva PCD") marcam isso no próprio
+título da vaga. Customizável do mesmo jeito que `KEYWORDS`:
+
+```
+EXCLUDE_KEYWORDS=pcd,deficiencia,estagio
+```
 
 ## E-mail de status (heartbeat)
 
@@ -165,6 +179,17 @@ poucos KB).
 
 - Trocar o e-mail por **Amazon SES** (autenticação SMTP parecida, só muda
   host/porta/credenciais) — evita depender de senha de app do Gmail.
-- Adicionar mais empresas (cada uma provavelmente precisa de um parser HTML
-  diferente, já que cada site de carreira tem estrutura própria).
+- Adicionar mais empresas (cada uma provavelmente precisa de um fetch/parser
+  próprio, já que cada site de carreira tem estrutura ou plataforma
+  diferente — o Itaú tem site próprio, o PicPay usa Oracle Cloud HCM).
 - Alertar via Slack/Telegram além de (ou em vez de) e-mail.
+
+## Sobre a fonte de vagas do PicPay
+
+Diferente do Itaú (scraping de HTML do site próprio), o PicPay usa Oracle
+Cloud HCM e as vagas são buscadas via `fetchPicPayJobs` (`picpay.go`) num
+endpoint JSON público — o mesmo que a página de carreiras deles usa por trás
+dos panos. Não é uma API oficialmente documentada pra esse uso, então se o
+PicPay trocar de plataforma de novo (já saíram da Gupy em algum momento),
+essa busca quebra sem aviso — mesmo risco que já existia com o HTML do
+Itaú, só que numa URL não pensada pra integração externa.
