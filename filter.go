@@ -26,6 +26,19 @@ var defaultExcludeKeywords = []string{
 	"deficiencia",
 }
 
+// defaultBTGKeywords é o filtro específico do BTG Pactual — mais restrito
+// que defaultKeywords porque o board deles cobre a empresa inteira (não só
+// Tecnologia), então aqui vale ser mais específico pra não trazer vaga de
+// área totalmente diferente.
+var defaultBTGKeywords = []string{
+	"junior",
+	"desenvolvedor",
+	"engenheiro",
+	"pleno",
+	".net",
+	"c#",
+}
+
 // loadCSVEnv lê uma lista separada por vírgula da env var indicada. Se não
 // estiver definida (ou vazia após o parse), usa fallback.
 func loadCSVEnv(envVar string, fallback []string) []string {
@@ -57,6 +70,12 @@ func loadKeywords() []string {
 // não estiver definida, usa defaultExcludeKeywords.
 func loadExcludeKeywords() []string {
 	return loadCSVEnv("EXCLUDE_KEYWORDS", defaultExcludeKeywords)
+}
+
+// loadBTGKeywords lê o filtro específico do BTG da env var BTG_KEYWORDS. Se
+// não estiver definida, usa defaultBTGKeywords.
+func loadBTGKeywords() []string {
+	return loadCSVEnv("BTG_KEYWORDS", defaultBTGKeywords)
 }
 
 // filterJobs mantém apenas as vagas cujo título casa com alguma keyword e

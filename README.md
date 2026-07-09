@@ -1,19 +1,21 @@
 # itau-job-alert
 
-Monitora as vagas de **Tecnologia** do Itaú e do PicPay e manda um e-mail
-quando aparece uma vaga nova que bate com seu filtro de palavras-chave. Cada
-execução faz UMA checagem (não fica em loop infinito) — quem controla a
-frequência é o agendador (EventBridge no Lambda, cron/systemd se rodar
-localmente).
+Monitora vagas de **Tecnologia** do Itaú, do PicPay e do BTG Pactual e manda
+um e-mail quando aparece uma vaga nova que bate com seu filtro de
+palavras-chave. Cada execução faz UMA checagem (não fica em loop infinito) —
+quem controla a frequência é o agendador (EventBridge no Lambda,
+cron/systemd se rodar localmente).
 
 ## Como funciona
 
-1. Baixa as vagas de `carreiras.itau.com.br` (HTML) e da API pública de
-   carreiras do PicPay (JSON, Oracle Cloud HCM).
-2. Extrai título + link de cada vaga, de ambas as fontes.
-3. Filtra pelo título usando as palavras-chave de `KEYWORDS` e descarta
-   as que batem com `EXCLUDE_KEYWORDS` (veja
-   [Filtro de vagas](#filtro-de-vagas)).
+1. Baixa as vagas do Itaú (`carreiras.itau.com.br`, HTML), do PicPay (API
+   pública do Oracle Cloud HCM, JSON) e do BTG Pactual (API pública oficial
+   do Greenhouse, JSON).
+2. Extrai título + link de cada vaga, das três fontes.
+3. Filtra pelo título: Itaú e PicPay usam `KEYWORDS`, o BTG usa
+   `BTG_KEYWORDS` (mais restrito, já que o board dele cobre a empresa
+   inteira). Em qualquer fonte, descarta as que batem com
+   `EXCLUDE_KEYWORDS` (veja [Filtro de vagas](#filtro-de-vagas)).
 4. Compara com o histórico do que já foi visto (`seen_jobs.json`, local ou no S3).
 5. Se tiver vaga nova relevante, manda **um e-mail só** listando todas as
    novas (de qualquer empresa) e atualiza o histórico.
@@ -48,6 +50,23 @@ título da vaga. Customizável do mesmo jeito que `KEYWORDS`:
 
 ```
 EXCLUDE_KEYWORDS=pcd,deficiencia,estagio
+```
+
+### Filtro à parte pro BTG Pactual
+
+O board de vagas do BTG cobre a empresa inteira — trading, risco, vendas,
+etc. — não só Tecnologia como o do Itaú, nem majoritariamente tech como o do
+PicPay. Por isso usa uma lista separada, `BTG_KEYWORDS`, mais restrita que
+`KEYWORDS`:
+
+```
+junior, desenvolvedor, engenheiro, pleno, .net, c#
+```
+
+Customizável como as outras:
+
+```
+BTG_KEYWORDS=Desenvolvedor,Pleno,.NET,C#,React,Azure
 ```
 
 ## E-mail de status (heartbeat)
@@ -181,15 +200,22 @@ poucos KB).
   host/porta/credenciais) — evita depender de senha de app do Gmail.
 - Adicionar mais empresas (cada uma provavelmente precisa de um fetch/parser
   próprio, já que cada site de carreira tem estrutura ou plataforma
-  diferente — o Itaú tem site próprio, o PicPay usa Oracle Cloud HCM).
+  diferente — o Itaú tem site próprio, o PicPay usa Oracle Cloud HCM, o BTG
+  usa Greenhouse). Antes de integrar uma nova, vale checar se ela usa
+  Greenhouse (`boards-api.greenhouse.io/v1/boards/<token>/jobs`) — é a API
+  pública oficialmente documentada, mais simples e estável de integrar.
 - Alertar via Slack/Telegram além de (ou em vez de) e-mail.
 
-## Sobre a fonte de vagas do PicPay
+## Sobre as fontes de vaga (fora o Itaú)
 
-Diferente do Itaú (scraping de HTML do site próprio), o PicPay usa Oracle
-Cloud HCM e as vagas são buscadas via `fetchPicPayJobs` (`picpay.go`) num
-endpoint JSON público — o mesmo que a página de carreiras deles usa por trás
-dos panos. Não é uma API oficialmente documentada pra esse uso, então se o
-PicPay trocar de plataforma de novo (já saíram da Gupy em algum momento),
-essa busca quebra sem aviso — mesmo risco que já existia com o HTML do
-Itaú, só que numa URL não pensada pra integração externa.
+**PicPay** — diferente do Itaú (scraping de HTML do site próprio), usa
+Oracle Cloud HCM e as vagas são buscadas via `fetchPicPayJobs` (`picpay.go`)
+num endpoint JSON público — o mesmo que a página de carreiras deles usa por
+trás dos panos. Não é uma API oficialmente documentada pra esse uso, então
+se o PicPay trocar de plataforma de novo (já saíram da Gupy em algum
+momento), essa busca quebra sem aviso.
+
+**BTG Pactual** — usa Greenhouse, e as vagas são buscadas via `fetchBTGJobs`
+(`btg.go`) na API pública **oficialmente documentada**
+(`developers.greenhouse.io/job-board.html`) — mais estável que a do PicPay,
+já que é pensada pra esse tipo de integração externa.

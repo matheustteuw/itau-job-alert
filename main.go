@@ -62,11 +62,23 @@ func run(ctx context.Context) error {
 	}
 	log.Printf("encontradas %d vagas no PicPay", len(picpayJobs))
 
-	jobs := append(itauJobs, picpayJobs...)
+	btgJobs, err := fetchBTGJobs()
+	if err != nil {
+		return fmt.Errorf("erro ao buscar vagas do BTG Pactual: %w", err)
+	}
+	log.Printf("encontradas %d vagas no BTG Pactual", len(btgJobs))
 
 	keywords := loadKeywords()
 	excludeKeywords := loadExcludeKeywords()
-	jobs = filterJobs(jobs, keywords, excludeKeywords)
+	btgKeywords := loadBTGKeywords()
+
+	// O BTG usa um filtro de palavras-chave próprio, mais restrito, porque
+	// o board deles cobre a empresa inteira — não só Tecnologia como o
+	// Itaú, nem já vem majoritariamente tech como o PicPay.
+	var jobs []Job
+	jobs = append(jobs, filterJobs(itauJobs, keywords, excludeKeywords)...)
+	jobs = append(jobs, filterJobs(picpayJobs, keywords, excludeKeywords)...)
+	jobs = append(jobs, filterJobs(btgJobs, btgKeywords, excludeKeywords)...)
 	log.Printf("%d vaga(s) relevante(s) após filtro de palavras-chave", len(jobs))
 
 	st, err := newStore(ctx)
