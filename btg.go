@@ -21,8 +21,8 @@ type btgResponse struct {
 }
 
 // fetchBTGJobs busca todas as vagas abertas do BTG Pactual (qualquer área —
-// o filtro por palavra-chave, mais restrito que o das outras empresas, é
-// aplicado depois via btgKeywords em run()).
+// o filtro por palavra-chave (KEYWORDS, o mesmo das outras empresas) é
+// aplicado depois em run()).
 func fetchBTGJobs() ([]Job, error) {
 	client := &http.Client{Timeout: 20 * time.Second}
 

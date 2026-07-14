@@ -12,10 +12,9 @@ cron/systemd se rodar localmente).
    pública do Oracle Cloud HCM, JSON) e do BTG Pactual (API pública oficial
    do Greenhouse, JSON).
 2. Extrai título + link de cada vaga, das três fontes.
-3. Filtra pelo título: Itaú e PicPay usam `KEYWORDS`, o BTG usa
-   `BTG_KEYWORDS` (mais restrito, já que o board dele cobre a empresa
-   inteira). Em qualquer fonte, descarta as que batem com
-   `EXCLUDE_KEYWORDS` (veja [Filtro de vagas](#filtro-de-vagas)).
+3. Filtra pelo título: as três fontes usam o mesmo `KEYWORDS`. Em qualquer
+   fonte, descarta as que batem com `EXCLUDE_KEYWORDS` (veja
+   [Filtro de vagas](#filtro-de-vagas)).
 4. Compara com o histórico do que já foi visto (`seen_jobs.json`, local ou no S3).
 5. Se tiver vaga nova relevante, manda **um e-mail só** listando todas as
    novas (de qualquer empresa) e atualiza o histórico.
@@ -27,7 +26,10 @@ Não faz candidatura automática — só avisa. Dá pra evoluir depois.
 Por padrão só entram vagas cujo título contenha alguma destas palavras:
 
 ```
-engenheiro, engenharia, java, .net, desenvolvedor
+engenheiro, engenharia, desenvolvedor, desenvolvimento, programador, software,
+backend, frontend, fullstack, full stack, .net, dotnet, c#, java, javascript,
+typescript, python, golang, react, node, angular, devops, cloud, azure, aws,
+inteligencia artificial, machine learning
 ```
 
 A comparação ignora acento e maiúsc/minúsc, então "Júnior", "JUNIOR" e
@@ -50,23 +52,6 @@ título da vaga. Customizável do mesmo jeito que `KEYWORDS`:
 
 ```
 EXCLUDE_KEYWORDS=pcd,deficiencia,estagio
-```
-
-### Filtro à parte pro BTG Pactual
-
-O board de vagas do BTG cobre a empresa inteira — trading, risco, vendas,
-etc. — não só Tecnologia como o do Itaú, nem majoritariamente tech como o do
-PicPay. Por isso usa uma lista separada, `BTG_KEYWORDS`, mais restrita que
-`KEYWORDS`:
-
-```
-desenvolvedor, engenheiro, .net, c#
-```
-
-Customizável como as outras:
-
-```
-BTG_KEYWORDS=Desenvolvedor,Pleno,.NET,C#,React,Azure
 ```
 
 ## E-mail de status (heartbeat)

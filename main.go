@@ -92,15 +92,11 @@ func run(ctx context.Context) error {
 
 	keywords := loadKeywords()
 	excludeKeywords := loadExcludeKeywords()
-	btgKeywords := loadBTGKeywords()
 
-	// O BTG usa um filtro de palavras-chave próprio, mais restrito, porque
-	// o board deles cobre a empresa inteira — não só Tecnologia como o
-	// Itaú, nem já vem majoritariamente tech como o PicPay.
 	var jobs []Job
 	jobs = append(jobs, filterJobs(itauJobs, keywords, excludeKeywords)...)
 	jobs = append(jobs, filterJobs(picpayJobs, keywords, excludeKeywords)...)
-	jobs = append(jobs, filterJobs(btgJobs, btgKeywords, excludeKeywords)...)
+	jobs = append(jobs, filterJobs(btgJobs, keywords, excludeKeywords)...)
 	log.Printf("%d vaga(s) relevante(s) após filtro de palavras-chave", len(jobs))
 
 	st, err := newStore(ctx)
@@ -278,9 +274,6 @@ func sendEmail(jobs []Job) error {
 	return smtp.SendMail(addr, auth, from, []string{to}, msg)
 }
 
-// sendHeartbeatEmail manda um e-mail curto avisando que o programa está
-// rodando normalmente, mesmo sem vaga nova pra reportar (útil pra saber que
-// o agendamento não quebrou silenciosamente).
 func sendHeartbeatEmail(totalVagasRastreadas int) error {
 	host := os.Getenv("SMTP_HOST")
 	portStr := os.Getenv("SMTP_PORT")

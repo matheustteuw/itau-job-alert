@@ -9,6 +9,10 @@ import (
 // "junior"/"pleno"/"senior" ficam de fora de propósito: são termos de nível,
 // não de área, então batem com vaga de qualquer área (ex: "Analista de
 // Mídia Pleno") e geram falso positivo pra quem só quer vaga de dev/eng.
+// "go" fica de fora (usamos "golang"): bate como substring em "cargo"/"logo".
+// "ia" solto também fica de fora: bate como substring em "especialista",
+// "estratégia", "presencial", "comercial" etc — praticamente qualquer título
+// em português — por isso usamos só termos mais longos e específicos pra IA.
 var defaultKeywords = []string{
 	"engenheiro",
 	"engenharia",
@@ -35,7 +39,6 @@ var defaultKeywords = []string{
 	"cloud",
 	"azure",
 	"aws",
-	"ia",
 	"inteligencia artificial",
 	"machine learning",
 }
@@ -47,19 +50,6 @@ var defaultKeywords = []string{
 var defaultExcludeKeywords = []string{
 	"pcd",
 	"deficiencia",
-}
-
-// defaultBTGKeywords é o filtro específico do BTG Pactual — mais restrito
-// que defaultKeywords porque o board deles cobre a empresa inteira (não só
-// Tecnologia), então aqui vale ser mais específico pra não trazer vaga de
-// área totalmente diferente. Mesmo motivo de defaultKeywords não ter
-// "junior"/"pleno"/"senior": são termos de nível, batem com vaga de
-// qualquer área.
-var defaultBTGKeywords = []string{
-	"desenvolvedor",
-	"engenheiro",
-	".net",
-	"c#",
 }
 
 // loadCSVEnv lê uma lista separada por vírgula da env var indicada. Se não
@@ -93,12 +83,6 @@ func loadKeywords() []string {
 // não estiver definida, usa defaultExcludeKeywords.
 func loadExcludeKeywords() []string {
 	return loadCSVEnv("EXCLUDE_KEYWORDS", defaultExcludeKeywords)
-}
-
-// loadBTGKeywords lê o filtro específico do BTG da env var BTG_KEYWORDS. Se
-// não estiver definida, usa defaultBTGKeywords.
-func loadBTGKeywords() []string {
-	return loadCSVEnv("BTG_KEYWORDS", defaultBTGKeywords)
 }
 
 // filterJobs mantém apenas as vagas cujo título casa com alguma keyword e
