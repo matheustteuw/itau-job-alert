@@ -27,7 +27,7 @@ Não faz candidatura automática — só avisa. Dá pra evoluir depois.
 Por padrão só entram vagas cujo título contenha alguma destas palavras:
 
 ```
-engenheiro, engenharia, java, .net, desenvolvedor, junior, pleno, senior
+engenheiro, engenharia, java, .net, desenvolvedor
 ```
 
 A comparação ignora acento e maiúsc/minúsc, então "Júnior", "JUNIOR" e
@@ -60,7 +60,7 @@ PicPay. Por isso usa uma lista separada, `BTG_KEYWORDS`, mais restrita que
 `KEYWORDS`:
 
 ```
-junior, desenvolvedor, engenheiro, pleno, .net, c#
+desenvolvedor, engenheiro, .net, c#
 ```
 
 Customizável como as outras:

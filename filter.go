@@ -5,16 +5,16 @@ import (
 	"strings"
 )
 
-// Uma vaga só é considerada relevante se o título contiver pelo menos uma
+// Uma vaga só é considerada relevante se o título contiver pelo menos uma.
+// "junior"/"pleno"/"senior" ficam de fora de propósito: são termos de nível,
+// não de área, então batem com vaga de qualquer área (ex: "Analista de
+// Mídia Pleno") e geram falso positivo pra quem só quer vaga de dev/eng.
 var defaultKeywords = []string{
 	"engenheiro",
 	"engenharia",
 	"java",
 	".net",
 	"desenvolvedor",
-	"junior",
-	"pleno",
-	"senior",
 }
 
 // defaultExcludeKeywords derruba vagas afirmativas exclusivas pra pessoas
@@ -29,12 +29,12 @@ var defaultExcludeKeywords = []string{
 // defaultBTGKeywords é o filtro específico do BTG Pactual — mais restrito
 // que defaultKeywords porque o board deles cobre a empresa inteira (não só
 // Tecnologia), então aqui vale ser mais específico pra não trazer vaga de
-// área totalmente diferente.
+// área totalmente diferente. Mesmo motivo de defaultKeywords não ter
+// "junior"/"pleno"/"senior": são termos de nível, batem com vaga de
+// qualquer área.
 var defaultBTGKeywords = []string{
-	"junior",
 	"desenvolvedor",
 	"engenheiro",
-	"pleno",
 	".net",
 	"c#",
 }

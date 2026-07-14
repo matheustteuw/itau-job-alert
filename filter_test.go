@@ -14,13 +14,37 @@ func TestFilterJobs(t *testing.T) {
 
 	got := filterJobs(jobs, defaultKeywords, defaultExcludeKeywords)
 
-	wantIDs := map[string]bool{"1": true, "2": true, "3": true, "5": true}
+	// "Analista de Dados Júnior" (3) não entra: "junior" sozinho não é
+	// suficiente, tem que ter termo de área (engenheiro/engenharia/etc).
+	wantIDs := map[string]bool{"1": true, "2": true, "5": true}
 	if len(got) != len(wantIDs) {
 		t.Fatalf("esperava %d vagas relevantes, veio %d: %+v", len(wantIDs), len(got), got)
 	}
 	for _, j := range got {
 		if !wantIDs[j.ID] {
 			t.Errorf("vaga %q (id=%s) não deveria ter passado no filtro", j.Title, j.ID)
+		}
+	}
+}
+
+func TestFilterJobsExcludesNonDevRolesWithSeniorityWords(t *testing.T) {
+	jobs := []Job{
+		{ID: "1", Title: "[PicPay] Analista de Mídia de Performance Pleno"},
+		{ID: "2", Title: "[PicPay] Analista de Produtos Junior - [Invest]"},
+		{ID: "3", Title: "[PicPay] Analista de Negócios Pleno | Projetos de Atendimento (CX)"},
+		{ID: "4", Title: "[Itaú] Engenharia de Software Backend Sr | Tech Lead - Bancos clientes riscos contas e Core banking"},
+		{ID: "5", Title: "[Itaú] Engenharia de Software Fullstack .Net/Angular Pleno | Atendimento Assistido"},
+	}
+
+	got := filterJobs(jobs, defaultKeywords, defaultExcludeKeywords)
+
+	wantIDs := map[string]bool{"4": true, "5": true}
+	if len(got) != len(wantIDs) {
+		t.Fatalf("esperava %d vagas relevantes, veio %d: %+v", len(wantIDs), len(got), got)
+	}
+	for _, j := range got {
+		if !wantIDs[j.ID] {
+			t.Errorf("vaga %q (id=%s) não deveria ter passado no filtro (nível sem área)", j.Title, j.ID)
 		}
 	}
 }
