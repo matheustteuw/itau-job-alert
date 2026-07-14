@@ -15,6 +15,8 @@ import (
 	"github.com/PuerkitoBio/goquery"
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/joho/godotenv"
+
+	_ "time/tzdata"
 )
 
 const (
@@ -22,6 +24,26 @@ const (
 	maxPages = 8
 	seenFile = "seen_jobs.json"
 )
+
+// brazilLocation é usado só pra exibir horário nos e-mails (Lambda roda em
+// UTC por padrão). Embarcado via time/tzdata pra não depender do runtime
+// provided.al2023 ter o banco de fusos horários instalado no sistema.
+var brazilLocation = func() *time.Location {
+	loc, err := time.LoadLocation("America/Sao_Paulo")
+	if err != nil {
+		return time.UTC
+	}
+	return loc
+}()
+
+// pluralSuffix retorna "s" se n != 1, "" caso contrário — concordância
+// simples tipo "vaga"/"vagas", "nova"/"novas", "encontrada"/"encontradas".
+func pluralSuffix(n int) string {
+	if n == 1 {
+		return ""
+	}
+	return "s"
+}
 
 type Job struct {
 	ID      string `json:"id"`
@@ -236,8 +258,9 @@ func sendEmail(jobs []Job) error {
 	}
 
 	var body strings.Builder
-	subject := fmt.Sprintf("[Itau Jobs] %d vaga(s) nova(s) de Tecnologia", len(jobs))
-	body.WriteString(fmt.Sprintf("Vaga(s) nova(s) encontradas em %s:\n\n", time.Now().Format("02/01/2006 15:04")))
+	s := pluralSuffix(len(jobs))
+	subject := fmt.Sprintf("[Itau Jobs] %d vaga%s nova%s de Tecnologia", len(jobs), s, s)
+	body.WriteString(fmt.Sprintf("Vaga%s nova%s encontrada%s em %s:\n\n", s, s, s, time.Now().In(brazilLocation).Format("02/01/2006 15:04")))
 	for _, j := range jobs {
 		body.WriteString(fmt.Sprintf("- [%s] %s\n  %s\n\n", j.Company, j.Title, j.URL))
 	}
@@ -275,10 +298,11 @@ func sendHeartbeatEmail(totalVagasRastreadas int) error {
 	}
 
 	subject := "[Itau Jobs] Ainda funcionando — nenhuma vaga nova"
+	s := pluralSuffix(totalVagasRastreadas)
 	body := fmt.Sprintf(
 		"Checagem de status em %s: o monitor de vagas continua rodando normalmente.\n\n"+
-			"Nenhuma vaga nova relevante desde o último e-mail. %d vaga(s) já rastreada(s) no total.\n",
-		time.Now().Format("02/01/2006 15:04"), totalVagasRastreadas)
+			"Nenhuma vaga nova relevante desde o último e-mail. %d vaga%s já rastreada%s no total.\n",
+		time.Now().In(brazilLocation).Format("02/01/2006 15:04"), totalVagasRastreadas, s, s)
 
 	msg := []byte(
 		"From: " + from + "\r\n" +
